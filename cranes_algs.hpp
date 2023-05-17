@@ -91,34 +91,38 @@ path crane_unloading_dyn_prog(const grid& setting) {
 	    // TODO: implement the dynamic programming algorithm, then delete this
       // comment.
       // Compute from_above if we are not on the top edge.
-      if (r > 0) {
+      if (r > 0 && A[r - 1][c].has_value()) {
         from_above = A[r - 1][c];
       }
-      if (c > 0) {
+
+      // Check if there is a valid cell to the left.
+      if (c > 0 && A[r][c - 1].has_value()) {
         from_left = A[r][c - 1];
       }
 
+      // If both from_above and from_left are empty, skip this cell.
+      if (!from_above && !from_left) {
+        continue;
+      }
+
+      // Choose the path with fewer cranes as the best path.
       if (from_above && from_left) {
         if ((*from_above).total_cranes() < (*from_left).total_cranes()) {
           A[r][c] = *from_above;
-          A[r][c]->add_step(STEP_DIRECTION_SOUTH);
         } else {
           A[r][c] = *from_left;
-          A[r][c]->add_step(STEP_DIRECTION_EAST);
         }
       } else if (from_above) {
         A[r][c] = *from_above;
-        A[r][c]->add_step(STEP_DIRECTION_SOUTH);
       } else if (from_left) {
         A[r][c] = *from_left;
-        A[r][c]->add_step(STEP_DIRECTION_EAST);
       }
+
+      // Add the current step to the best path.
+      A[r][c]->add_step(STEP_DIRECTION_START);
     }
   }
 
-  assert(best->has_value());
-  std::cout << "total cranes" << (**best).total_cranes() << std::endl;
-
-   return **best;
-	}
+  assert(A[setting.rows() - 1][setting.columns() - 1].has_value());
+  return *A[setting.rows() - 1][setting.columns() - 1];
 }
