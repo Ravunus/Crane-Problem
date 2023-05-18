@@ -13,7 +13,8 @@
 #pragma once
 
 #include <cassert>
-#include <math.h>
+#include <optional>
+#include <vector>
 
 #include "cranes_types.hpp"
 
@@ -28,40 +29,49 @@ namespace cranes {
 //
 // The grid must be non-empty.
 path crane_unloading_exhaustive(const grid& setting) {
+  coordinate rows = setting.rows();
+  coordinate columns = setting.columns();
+  coordinate total_moves = rows + columns - 2;
 
-  // grid must be non-empty.
-  assert(setting.rows() > 0);
-  assert(setting.columns() > 0);
+  // Initialize the best path found so far.
+  path best_path(setting);
 
-  // Compute maximum path length, and check that it is legal.
-  const size_t max_steps = setting.rows() + setting.columns() - 2;
-  assert(max_steps < 64);
+  // Loop through all possible move sequences.
+  for (coordinate i = 0; i < (1 << total_moves); ++i) {
+    path current_path(setting);
 
-  // TODO: implement the exhaustive search algorithm, then delete this
-  // comment.
-  path best(setting);
-  for (size_t steps = 0; steps <= max_steps; steps++) {
-    path current(setting);
-    for (size_t i = 0; i < steps; i++) {
-      if (current.is_step_valid(STEP_DIRECTION_EAST)) {
-        current.add_step(STEP_DIRECTION_EAST);
+    // Generate the current move sequence from the binary representation.
+    for (coordinate move = 0; move < total_moves; ++move) {
+      step_direction direction;
+      if (i & (1 << move)) {
+        direction = STEP_DIRECTION_SOUTH;
       } else {
-        current.add_step(STEP_DIRECTION_SOUTH);
+        direction = STEP_DIRECTION_EAST;
+      }
+
+      // Check if the current step is valid.
+      if (current_path.is_step_valid(direction)) {
+        current_path.add_step(direction);
+      } else {
+        // Skip the invalid path.
+        break;
       }
     }
-    if (current.total_cranes() < best.total_cranes()) {
-      best = current;
+
+    // Update the best path if the current path has more cranes reached.
+    if (current_path.total_cranes() > best_path.total_cranes()) {
+      best_path = current_path;
     }
   }
 
-  return best;
+  return best_path;
 }
+
 
 // Solve the crane unloading problem for the given grid, using a dynamic
 // programming algorithm.
 //
 // The grid must be non-empty.
-//path crane_unloading_dyn_prog(const grid& setting) {
 path crane_unloading_dyn_prog(const grid& setting) {
 
   // grid must be non-empty.
@@ -91,38 +101,33 @@ path crane_unloading_dyn_prog(const grid& setting) {
 	    // TODO: implement the dynamic programming algorithm, then delete this
       // comment.
       // Compute from_above if we are not on the top edge.
-      if (r > 0 && A[r - 1][c].has_value()) {
+      if (r > 0) {
         from_above = A[r - 1][c];
       }
-
-      // Check if there is a valid cell to the left.
-      if (c > 0 && A[r][c - 1].has_value()) {
+      if (c > 0) {
         from_left = A[r][c - 1];
       }
 
-      // If both from_above and from_left are empty, skip this cell.
-      if (!from_above && !from_left) {
-        continue;
-      }
-
-      // Choose the path with fewer cranes as the best path.
       if (from_above && from_left) {
         if ((*from_above).total_cranes() < (*from_left).total_cranes()) {
           A[r][c] = *from_above;
+          A[r][c]->add_step(STEP_DIRECTION_SOUTH);
         } else {
           A[r][c] = *from_left;
+          A[r][c]->add_step(STEP_DIRECTION_EAST);
         }
       } else if (from_above) {
         A[r][c] = *from_above;
+        A[r][c]->add_step(STEP_DIRECTION_SOUTH);
       } else if (from_left) {
         A[r][c] = *from_left;
+        A[r][c]->add_step(STEP_DIRECTION_EAST);
       }
-
-      // Add the current step to the best path.
-      A[r][c]->add_step(STEP_DIRECTION_START);
     }
   }
 
   assert(A[setting.rows() - 1][setting.columns() - 1].has_value());
   return *A[setting.rows() - 1][setting.columns() - 1];
+  }
+
 }
